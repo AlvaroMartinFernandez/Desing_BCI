@@ -1,0 +1,298 @@
+%%MUESTRAS TOMADAS DE PHYSIONET https://physionet.org/content/eegmmidb/1.0.0
+%%Realizamos descomposicion de Wavalet Tree para tomar muestras
+%%comprendidas entre 0-30 HZ
+%cargamos ejemplo de toma de datos
+dir='C:\Users\alvaro\Desktop\UNIVERSIDAD\TFG\MuestrasPhysionet\files\';
+c='\';
+d='.edf';
+load('PassBand.mat');
+load('Alfa.mat');
+load('Beta.mat');
+load('Theta.mat');
+load('Delta.mat');
+%Funciones para cargar todos los sujetos y las sesiones en un fichero
+for sujetos=1:109
+
+for sesionaux=2:7
+
+    if sujetos<10
+        a='S00';
+    elseif (9<sujetos)&&(sujetos<100)
+        a='S0';
+    else
+        a='S';
+    end
+    sesion= sesionaux*2;
+    if sesion<10
+        b='R0';
+    else
+        b='R';
+    end
+suj=string(sujetos);
+ses = string(sesion);
+filename= strcat(dir,a,suj,c,a,suj,b,ses,d);
+
+[data, anotaciones]=edfread(filename);
+
+%Extraemos los canales que nos interesan par ala imaginacion motora C3,Cz y
+%C4
+CanalCz= data.Cz__{1,1};
+CanalCz=transpose(CanalCz);
+CanalC3=data.C3__{1,1};
+CanalC3=transpose(CanalC3);
+CanalC4=data.C4__{1,1};
+CanalC4=transpose(CanalC4);
+long= length(data.Cz__);
+for x=2:long
+auxC3= data.C3__{x,1};
+auxCz= data.Cz__{x,1};
+auxC4= data.C4__{x,1};
+auxC3= transpose(auxC3);
+auxCz= transpose(auxCz);
+auxC4= transpose(auxC4);
+CanalC4= [CanalC4 auxC4];
+CanalC3= [CanalC3 auxC3];
+CanalCz= [CanalCz auxCz];
+eventostime= anotaciones.Onset;
+eventoslabel= anotaciones.Annotations;
+end
+
+%Preprocesamos los 30 eventos por sesion segundo a segundo para extraer sus
+%caracteristicas y clasificarlos
+
+for x=1:30
+event=seconds(eventostime(x));
+tipoevento=eventoslabel(x);
+for e=0:3
+c3aux= CanalC3(1,160*event+1+(e*160):160*(event+1)+(e*160));
+c4aux= CanalC4(1,160*event+1+(e*160):160*(event+1)+(e*160));
+czaux= CanalCz(1,160*event+1+(e*160):160*(event+1)+(e*160));
+
+%%Filtramos la señas para observar la componente Alfa comprendida entre
+%8-13Hz
+c3alfat=filter(Alfa,c3aux);
+czalfat=filter(Alfa,czaux);
+c4alfat=filter(Alfa,c4aux);
+%Funcion Wavalet para descomponer la señas y tener reducir el nº de muestras
+[cc3 ,lc3]= wavedec(c3alfat,1,'db2');
+[ccz ,lcz]= wavedec(czalfat,1,'db2');
+[cc4 ,lc4]= wavedec(c4alfat,1,'db2');
+c3alfat = appcoef(cc3,lc3,'db2'); 
+czalfat = appcoef(ccz,lcz,'db2'); 
+c4alfat = appcoef(cc4,lc4,'db2'); 
+ft=((0:length(c4alfat)-1)/length(c4alfat));
+
+%Calculamos la Densidad espectral de Potencia mediante el metodo Welch 
+[C3welchalfa,f] = pwelch(c3alfat);
+[Czwelchalfa,f] = pwelch(czalfat);
+[C4welchalfa,f] = pwelch(c4alfat);
+%Calculamos la FFT de la señal.
+C3alfat = abs(fft(c3alfat)); 
+Czalfat = abs(fft(czalfat));
+C4alfat = abs(fft(c4alfat)); 
+
+%%Filtramos la señas para observar la componente Beta comprendida entre
+%14-30Hz
+c3betat=filter(Beta,c3aux);
+czbetat=filter(Beta,czaux);
+c4betat=filter(Beta,c4aux);
+%Funcion Wavalet para descomponer la señas y tener reducir el nº de muestras
+[cc3 ,lc3]= wavedec(c3betat,1,'db2');
+[ccz ,lcz]= wavedec(czbetat,1,'db2');
+[cc4 ,lc4]= wavedec(c4betat,1,'db2');
+c3betat = appcoef(cc3,lc3,'db2'); 
+czbetat = appcoef(ccz,lcz,'db2'); 
+c4betat = appcoef(cc4,lc4,'db2'); 
+%Calculamos la Densidad espectral de Potencia mediante el metodo Welc
+[C3welchbeta,f] = pwelch(c3betat);
+[Czwelchbeta,f] = pwelch(czbetat);
+[C4welchbeta,f] = pwelch(c4betat);
+%Calculamos la FFT de la señal.
+C3betat = abs(fft(c3betat)); 
+Czbetat = abs(fft(czbetat));
+C4betat = abs(fft(c4betat)); 
+
+%%Filtramos la señas para observar todo el espectro entre
+%0.5-30Hz
+c3band=filter(PassBand,c3aux);
+czband=filter(PassBand,czaux);
+c4band=filter(PassBand,c4aux);
+%Funcion Wavalet para descomponer la señas y tener reducir el nº de muestras
+[cc3 ,lc3]= wavedec(c3band,1,'db2');
+[ccz ,lcz]= wavedec(czband,1,'db2');
+[cc4 ,lc4]= wavedec(c4band,1,'db2');
+C3band = appcoef(cc3,lc3,'db2'); 
+Czband = appcoef(ccz,lcz,'db2'); 
+C4band = appcoef(cc4,lc4,'db2'); 
+%Calculamos la FFT de la señal.
+C3band = abs(fft(C3band)); 
+Czband = abs(fft(Czband)); 
+C4band = abs(fft(C4band));
+%Cogemos la mitad del espectro
+C3band=C3band(1:41);
+Czband=Czband(1:41);
+C4band=C4band(1:41);
+fb=((0:40)/40)*40;
+%Longitud temporal
+ft=((0:length(C4alfat)-1)/length(C4alfat));
+%Longitud densidad espectral
+f=(f/(2*pi))*80;
+% %%Representacion Grafica
+% figure(e+1);
+% subplot(3,2,1);
+% plot(ft,C3alfat,ft,C3betat);
+% title('C3(t) Alfa&Beta Evento',tipoevento);
+% 
+% subplot(3,2,3);
+% plot(ft,Czalfat,ft,Czbetat)
+% title('Cz(t) Alfa&Beta Evento',tipoevento);
+% 
+% subplot(3,2,5);
+% plot(ft,C4alfat,ft,C4betat)
+% title('C4(t) Alfa&Beta Evento',tipoevento);
+% 
+% subplot(3,2,2);
+% plot(f,C3welchalfa,f,C4welchalfa,f,Czwelchalfa)
+% title('DSP Alfa Evento',tipoevento);
+% subplot(3,2,4);
+% plot(f,C3welchbeta,f,C4welchbeta,f,Czwelchbeta)
+% title('DSP Beta Evento',tipoevento);
+% 
+% subplot(3,2,6);
+% plot(fb,C3band,fb,Czband,fb,C4band)
+% title('DSP Alfa & Beta Evento',tipoevento);
+%miramos las frecuencisa de 14 a 18Hz
+C3welchalfa = C3welchalfa(1:58);
+Czwelchalfa = Czwelchalfa(1:58);
+C4welchalfa = C4welchalfa(1:58);
+C3welchbeta = C3welchbeta(1:58);
+Czwelchbeta = Czwelchbeta(1:58);
+C4welchbeta = C4welchbeta(1:58);
+%%Extracion de Caracteristicas 
+% Alfa 
+C3VARa=var(C3alfat);
+CzVARa=var(Czalfat);
+C4VARa=var(C4alfat);
+C3COVARa=cov(C3alfat);
+CzCOVARa=cov(Czalfat);
+C4COVARa=cov(C4alfat);
+C3MEANa=cov(C3alfat);
+CzMEANa=cov(Czalfat);
+C4MEANa=cov(C4alfat);
+C3STDa=std(C3alfat);
+CzSTDa=std(Czalfat);
+C4STDa=std(C4alfat);
+C3MAXPSDa=max(C3welchalfa);
+CzMAXPSDa=max(Czwelchalfa);
+C4MAXPSDa=max(C4welchalfa);
+c3VARa=var(c3alfat);
+czVARa=var(czalfat);
+c4VARa=var(c4alfat);
+c3COVARa=cov(c3alfat);
+czCOVARa=cov(czalfat);
+c4COVARa=cov(c4alfat);
+c3MEANa=cov(c3alfat);
+czMEANa=cov(czalfat);
+c4MEANa=cov(c4alfat);
+c3STDa=std(c3alfat);
+czSTDa=std(czalfat);
+c4STDa=std(c4alfat);
+c3MAXa=max(c3alfat);
+czMAXa=max(czalfat);
+c4MAXa=max(c4alfat);
+c3MINa=min(c3alfat);
+czMINa=min(czalfat);
+c4MINa=min(c4alfat);
+
+%Beta
+C3VARb=var(C3betat);
+CzVARb=var(Czbetat);
+C4VARb=var(C4betat);
+C3COVARb=cov(C3betat);
+CzCOVARb=cov(Czbetat);
+C4COVARb=cov(C4betat);
+C3MEANb=cov(C3betat);
+CzMEANb=cov(Czbetat);
+C4MEANb=cov(C4betat);
+C3STDb=std(C3betat);
+CzSTDb=std(Czbetat);
+C4STDb=std(C4betat);
+C3MAXPSDb=max(C3welchbeta);
+CzMAXPSDb=max(Czwelchbeta);
+C4MAXPSDb=max(C4welchbeta);
+c3VARb=var(c3betat);
+czVARb=var(czbetat);
+c4VARb=var(c4betat);
+c3COVARb=cov(c3betat);
+czCOVARb=cov(czbetat);
+c4COVARb=cov(c4betat);
+c3MEANb=cov(c3betat);
+czMEANb=cov(czbetat);
+c4MEANb=cov(c4betat);
+c3STDb=std(c3betat);
+czSTDb=std(czbetat);
+c4STDb=std(c4betat);
+c3MAXb=max(c3betat);
+czMAXb=max(czbetat);
+c4MAXb=max(c4betat);
+c3MINb=min(c3betat);
+czMINb=min(czbetat);
+c4MINb=min(c4betat);
+
+%%ETIQUETAMOS EL EVENTO
+
+% Cambiamos la etiqueta a los segundo que no corresponden con el evento
+% El evento lo identificamos por que se produce una desincronizacion en la zona de actividad produciendo una baja respuesta en alfa y en beta frecuencias bajas una respuesta alta.
+if tipoevento == "T2" %Imaginacion motora mano derecha
+    if ((sesion==4)||(sesion==8)||(sesion==12))
+        if((C3MAXPSDa< C4MAXPSDa)&&(C3MAXPSDa<CzMAXPSDa)&&(C3MAXPSDb>1.5*C3MAXPSDa))
+            ETIQUETA=1;%Evento imaginacion mano derecha
+        else
+            ETIQUETA=0;%No corresponde con imaginacion mano derecha
+        end
+    else
+     ETIQUETA=4;%Muestras Descartadas 
+    end
+elseif tipoevento == "T0"
+    ETIQUETA =0;%relajacion y otras muestras que no corresponden con el movimiento de manos y pies
+else 
+    if (sesion==4)||(sesion==8)||(sesion==12)
+      if((C4MAXPSDa< C3MAXPSDa)&&(C4MAXPSDa<CzMAXPSDa)&&(C4MAXPSDb>1.5*C4MAXPSDa))  
+          ETIQUETA=2;%Evento imaginacion mano izquierda
+      else
+          ETIQUETA=0;%No corresponde con imaginacion mano izquierda
+      end
+    else
+        if((CzMAXPSDa< C3MAXPSDa)&&(CzMAXPSDa<C4MAXPSDa)&&(C4MAXPSDb>1.3*CzMAXPSDa)&&(C4MAXPSDb>1.3*C4MAXPSDa)&&(C4MAXPSDb>CzMAXPSDb)&&(C4MAXPSDb>1.5*CzMAXPSDa))
+            ETIQUETA=3;%Evento imaginacion pies
+        else
+            ETIQUETA=0;%No corresponde con imaginacion pies izquierda
+        end
+    end
+end
+%Vector de caracteristicas para el MACHINE LEARNING
+DAT = [ C3VARa,C3COVARa,C3MEANa,C3STDa,C3MAXPSDa,c3VARa,c3COVARa,c3MEANa,c3STDa,c3MAXa,c3MINa,CzVARa,CzCOVARa,CzMEANa,CzMAXPSDa,CzSTDa,czVARa,czCOVARa,czMEANa,czSTDa,czMAXa,czMINa,C4VARa,C4COVARa,C4MEANa,C4MAXPSDa,C4STDa,c4VARa,c4COVARa,c4MEANa,c4STDa,c4MAXa,c4MINa,C3VARb,C3COVARb,C3MEANb,C3MAXPSDb,C3STDb,c3VARb,c3COVARb,c3MEANb,c3STDb,c3MAXb,c3MINb,CzVARb,CzCOVARb,CzMEANb,CzMAXPSDb,CzSTDb,czVARb,czCOVARb,czMEANb,czSTDb,czMAXb,czMINb,C4VARb,C4COVARb,C4MEANb,C4MAXPSDb,C4STDb,c4VARb,c4COVARb,c4MEANb,c4STDb,c4MAXb,c4MINb,ETIQUETA];
+if e>0
+    DATO =[DATO;DAT];
+ else
+    DATO= DAT;
+end
+end
+ if x>1
+    DATOS =[DATOS;DATO];
+ else
+    DATOS= DATO;
+ end
+end
+ if sesion>4
+    SUJETO =[SUJETO;DATOS];
+ else
+    SUJETO= DATOS;
+ end
+end
+ if sujetos>1
+    BaseDatos =[BaseDatos;SUJETO];
+ else
+    BaseDatos= SUJETO;
+ end
+end
